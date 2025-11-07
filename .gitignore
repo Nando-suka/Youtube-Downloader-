@@ -1,0 +1,20 @@
+# Environment variables
+.env
+
+# Build files
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Output directories
+downloads/
+temp/
+
+# OS specific
+.DS_Store
+Thumbs.db
