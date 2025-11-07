@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube to MP3 Downloader</title>
+    <link rel="stylesheet" href="/staticDua/style.css">
+</head>
+<body>
+    <header>
+        <h3 class="header-2">Selamat Datang di YouTube Downloader</h3>
+    </header>
+
+    <main class="container">
+        <h1>YouTube to MP3 Converter</h1>
+        
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="Cari video..." autocomplete="off">
+            <button onclick="searchVideos()">Cari</button>
+        </div>
+        
+        <div id="searchResults" class="results-container"></div>
+        
+        <form action="/download" method="POST" id="downloadForm">
+            <input type="url" name="url" id="videoUrl" placeholder="Masukkan URL YouTube..." required autocomplete="off">
+            <button type="submit" disabled id="downloadBtn">Convert to MP3</button>
+        </form>
+    </main>
+
+    <script>
+        // Loading state
+        function showLoading(container, show = true) {
+            if (show) {
+                container.innerHTML = '<div class="loading">Searching...</div>';
+            } else {
+                container.innerHTML = '';
+            }
+        }
+
+        // Debounce function
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        async function searchVideos() {
+            const searchInput = document.getElementById('searchInput');
+            const resultsContainer = document.getElementById('searchResults');
+            
+            const query = searchInput.value.trim();
+            if (!query) {
+                resultsContainer.innerHTML = '';
+                return;
+            }
+
+            showLoading(resultsContainer, true);
+
+            try {
+                const response = await fetch(`/search?q=${encodeURIComponent(query)}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log("API Response:", data);
+                
+                resultsContainer.innerHTML = '';
+                
+                if (!data.items || data.items.length === 0) {
+                    resultsContainer.innerHTML = '<div class="no-results">Tidak ada hasil ditemukan</div>';
+                    return;
+                }
+                
+                data.items.forEach(item => {
+                    const videoDiv = document.createElement('div');
+                    videoDiv.className = 'video-item';
+                    videoDiv.setAttribute('role', 'button');
+                    videoDiv.setAttribute('tabindex', '0');
+                    videoDiv.innerHTML = `
+                        <img src="${item.snippet.thumbnails.default.url}" alt="Thumbnail ${item.snippet.title}" loading="lazy">
+                        <div class="video-info">
+                            <h3>${escapeHtml(item.snippet.title)}</h3>
+                            <p>Channel: ${escapeHtml(item.snippet.channelTitle)}</p>
+                            <button onclick="selectVideo('${escapeHtml(item.id.videoId)}')" aria-label="Pilih video ${item.snippet.title}">Pilih Video</button>
+                        </div>
+                    `;
+                    
+                    // Keyboard support
+                    videoDiv.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                            selectVideo(item.id.videoId);
+                        }
+                    });
+                    
+                    resultsContainer.appendChild(videoDiv);
+                });
+            } catch (error) {
+                console.error('Error:', error);
+                resultsContainer.innerHTML = `<div class="error-message">Gagal memuat hasil pencarian: ${error.message}</div>`;
+            }
+        }
+
+        function selectVideo(videoId) {
+            const urlInput = document.getElementById('videoUrl');
+            urlInput.value = `https://youtu.be/${videoId}`;
+            urlInput.focus();
+            
+            document.getElementById('searchResults').innerHTML = '<div class="success-message">Video dipilih! Siap untuk download.</div>';
+            document.getElementById('searchInput').value = '';
+            
+            // Enable download button
+            document.getElementById('downloadBtn').disabled = false;
+        }
+
+        // Escape HTML untuk keamanan
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Search on Enter key
+        document.getElementById('searchInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const query = document.getElementById('searchInput').value.trim();
+                if (query) {
+                    searchVideos();
+                }
+            }
+        });
+
+        // Debounced search (optional - search saat user berhenti mengetik)
+        const debouncedSearch = debounce(() => {
+            const query = document.getElementById('searchInput').value.trim();
+            if (query) {
+                searchVideos();
+            }
+        }, 500);
+        document.getElementById('searchInput').addEventListener('input', debouncedSearch);
+        // Form validation
+        document.getElementById('videoUrl').addEventListener('input', function() {
+            const btn = document.getElementById('downloadBtn');
+            btn.disabled = !this.value.trim();
+        });
+    </script>
+</body>
+</html>
