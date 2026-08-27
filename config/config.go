@@ -49,14 +49,30 @@ func loadAPIKeys() []string {
 
 	// Main API key
 	if mainKey := os.Getenv("YOUTUBE_API_KEY_MAIN"); mainKey != "" {
-		keys = append(keys, mainKey)
+		decrypted, err := decryptAPIKeyIfEncrypted(mainKey)
+		if err != nil {
+			log.Printf("Warning: Failed to decrypt YOUTUBE_API_KEY_MAIN: %v", err)
+			// Fallback ke plain key jika decrypt gagal
+			decrypted = mainKey
+		}
+		if decrypted != "" {
+			keys = append(keys, decrypted)
+		}
 	}
 
 	// Backup keys
 	for i := 1; i <= 5; i++ {
-		key := os.Getenv("YOUTUBE_API_KEY_BACKUP_" + strconv.Itoa(i))
-		if key != "" {
-			keys = append(keys, key)
+		keyEnv := "YOUTUBE_API_KEY_BACKUP_" + strconv.Itoa(i)
+		if key := os.Getenv(keyEnv); key != "" {
+			decrypted, err := decryptAPIKeyIfEncrypted(key)
+			if err != nil {
+				log.Printf("Warning: Failed to decrypt %s: %v", keyEnv, err)
+				// Fallback ke plain key jika decrypt gagal
+				decrypted = key
+			}
+			if decrypted != "" {
+				keys = append(keys, decrypted)
+			}
 		}
 	}
 

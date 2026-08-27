@@ -12,7 +12,7 @@
     </header>
 
     <main class="container">
-        <h1>YouTube to MP3 Converter</h1>
+        <h1>YouTube to MP3 Converter by: AI and Fernando</h1>
         
         <div class="search-box">
             <input type="text" id="searchInput" placeholder="Cari video..." autocomplete="off">
@@ -21,10 +21,19 @@
         
         <div id="searchResults" class="results-container"></div>
         
-        <form action="/download" method="POST" id="downloadForm">
+        <form id="downloadForm">
             <input type="url" name="url" id="videoUrl" placeholder="Masukkan URL YouTube..." required autocomplete="off">
             <button type="submit" disabled id="downloadBtn">Convert to MP3</button>
         </form>
+        
+        <div id="downloadStatus" class="download-status"></div>
+        
+        <!-- Download History Section -->
+        <section id="historySection" class="history-section">
+            <h2>Riwayat Download</h2>
+            <button onclick="loadHistory()" class="refresh-btn">🔄 Refresh</button>
+            <div id="historyContainer" class="history-container"></div>
+        </section>
     </main>
 
     <script>
@@ -64,12 +73,13 @@
 
             try {
                 const response = await fetch(`/search?q=${encodeURIComponent(query)}`);
+                const result = await response.json();
                 
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                if (!result.success) {
+                    throw new Error(result.error?.message || `HTTP ${response.status}: ${response.statusText}`);
                 }
                 
-                const data = await response.json();
+                const data = result.data;
                 console.log("API Response:", data);
                 
                 resultsContainer.innerHTML = '';
@@ -145,10 +155,282 @@
             }
         }, 500);
         document.getElementById('searchInput').addEventListener('input', debouncedSearch);
-        // Form validation
-        document.getElementById('videoUrl').addEventListener('input', function() {
-            const btn = document.getElementById('downloadBtn');
-            btn.disabled = !this.value.trim();
+        // Form validation dengan validasi real-time
+        const urlInput = document.getElementById('videoUrl');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const downloadForm = document.getElementById('downloadForm');
+        
+        // Validasi URL pattern
+        const youtubePattern = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+/;
+        const soundcloudPattern = /^(https?:\/\/)?(www\.)?soundcloud\.com\/.+/;
+        
+        function validateURL(url) {
+            if (!url.trim()) {
+                return { valid: false, message: 'URL tidak boleh kosong' };
+            }
+            
+            if (url.length > 2048) {
+                return { valid: false, message: 'URL terlalu panjang (maksimal 2048 karakter)' };
+            }
+            
+            if (!youtubePattern.test(url) && !soundcloudPattern.test(url)) {
+                return { valid: false, message: 'URL tidak valid. Hanya mendukung YouTube dan SoundCloud' };
+            }
+            
+            return { valid: true };
+        }
+        
+        // Real-time validation
+        urlInput.addEventListener('input', function() {
+            const url = this.value.trim();
+            const validation = validateURL(url);
+            const statusDiv = document.getElementById('downloadStatus');
+            
+            if (url === '') {
+                downloadBtn.disabled = true;
+                statusDiv.innerHTML = '';
+                urlInput.classList.remove('invalid', 'valid');
+                return;
+            }
+            
+            if (validation.valid) {
+                downloadBtn.disabled = false;
+                urlInput.classList.remove('invalid');
+                urlInput.classList.add('valid');
+                statusDiv.innerHTML = '';
+            } else {
+                downloadBtn.disabled = true;
+                urlInput.classList.remove('valid');
+                urlInput.classList.add('invalid');
+                statusDiv.innerHTML = `<div class="status-message error small">${escapeHtml(validation.message)}</div>`;
+            }
+        });
+        
+        // Validasi saat submit
+        downloadForm.addEventListener('submit', function(e) {
+            const url = urlInput.value.trim();
+            const validation = validateURL(url);
+            
+            if (!validation.valid) {
+                e.preventDefault();
+                showError(document.getElementById('downloadStatus'), validation.message);
+                urlInput.focus();
+                return false;
+            }
+        });
+
+        // Download form handler dengan async job dan polling
+        document.getElementById('downloadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const urlInput = document.getElementById('videoUrl');
+            const downloadBtn = document.getElementById('downloadBtn');
+            const statusDiv = document.getElementById('downloadStatus');
+            const url = urlInput.value.trim();
+            
+            if (!url) {
+                showError(statusDiv, 'URL tidak boleh kosong');
+                return;
+            }
+
+            // Disable button dan show loading
+            downloadBtn.disabled = true;
+            downloadBtn.textContent = 'Mengirim...';
+            statusDiv.innerHTML = '<div class="status-message info">Mengirim request download...</div>';
+
+            try {
+                // Submit job
+                const response = await fetch('/download', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ url: url })
+                });
+
+                const result = await response.json();
+
+                if (!result.success) {
+                    throw new Error(result.error?.message || 'Gagal membuat job download');
+                }
+
+                const jobId = result.data.job_id;
+                statusDiv.innerHTML = `
+                    <div class="status-message info">
+                        <div>Job dibuat dengan ID: <code>${escapeHtml(jobId)}</code></div>
+                        <div class="progress-container">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+                            </div>
+                            <div class="progress-text" id="progressText">Menunggu...</div>
+                        </div>
+                    </div>
+                `;
+
+                // Start polling
+                pollJobStatus(jobId, statusDiv, downloadBtn, urlInput);
+
+            } catch (error) {
+                console.error('Download error:', error);
+                showError(statusDiv, error.message);
+                downloadBtn.disabled = false;
+                downloadBtn.textContent = 'Convert to MP3';
+            }
+        });
+
+        // Polling function untuk mengecek status job
+        async function pollJobStatus(jobId, statusDiv, downloadBtn, urlInput) {
+            const maxAttempts = 120; // 2 menit dengan interval 1 detik
+            let attempts = 0;
+            const progressFill = document.getElementById('progressFill');
+            const progressText = document.getElementById('progressText');
+
+            const poll = async () => {
+                try {
+                    const response = await fetch(`/download/${jobId}/status`);
+                    const result = await response.json();
+
+                    if (!result.success) {
+                        throw new Error(result.error?.message || 'Gagal mendapatkan status job');
+                    }
+
+                    const job = result.data;
+                    attempts++;
+
+                    // Update progress
+                    if (progressFill && progressText) {
+                        const progress = job.progress || 0;
+                        progressFill.style.width = progress + '%';
+                        
+                        let statusText = 'Menunggu...';
+                        if (job.status === 'processing') {
+                            statusText = 'Sedang memproses...';
+                        } else if (job.status === 'completed') {
+                            statusText = 'Selesai!';
+                        } else if (job.status === 'failed') {
+                            statusText = 'Gagal';
+                        }
+                        progressText.textContent = statusText;
+                    }
+
+                    // Handle status
+                    if (job.status === 'completed') {
+                        statusDiv.innerHTML = `
+                            <div class="status-message success">
+                                <div>Download selesai!</div>
+                                <a href="/download/${jobId}/file" download class="download-link">
+                                    <button>Download MP3</button>
+                                </a>
+                            </div>
+                        `;
+                        downloadBtn.disabled = false;
+                        downloadBtn.textContent = 'Convert to MP3';
+                        urlInput.value = '';
+                        return;
+                    }
+
+                    if (job.status === 'failed') {
+                        showError(statusDiv, job.error || 'Download gagal');
+                        downloadBtn.disabled = false;
+                        downloadBtn.textContent = 'Convert to MP3';
+                        return;
+                    }
+
+                    // Continue polling jika masih pending/processing
+                    if (attempts < maxAttempts && (job.status === 'pending' || job.status === 'processing')) {
+                        setTimeout(poll, 1000); // Poll setiap 1 detik
+                    } else if (attempts >= maxAttempts) {
+                        showError(statusDiv, 'Timeout: Proses download terlalu lama');
+                        downloadBtn.disabled = false;
+                        downloadBtn.textContent = 'Convert to MP3';
+                    }
+
+                } catch (error) {
+                    console.error('Polling error:', error);
+                    if (attempts < maxAttempts) {
+                        setTimeout(poll, 2000); // Retry setelah 2 detik jika error
+                    } else {
+                        showError(statusDiv, error.message);
+                        downloadBtn.disabled = false;
+                        downloadBtn.textContent = 'Convert to MP3';
+                    }
+                }
+            };
+
+            // Start polling setelah 1 detik
+            setTimeout(poll, 1000);
+        }
+
+        // Helper untuk menampilkan error
+        function showError(container, message) {
+            container.innerHTML = `<div class="status-message error">${escapeHtml(message)}</div>`;
+        }
+        
+        // Load dan tampilkan riwayat download
+        async function loadHistory() {
+            const container = document.getElementById('historyContainer');
+            container.innerHTML = '<div class="loading">Memuat riwayat...</div>';
+            
+            try {
+                const response = await fetch('/history');
+                const result = await response.json();
+                
+                if (!result.success) {
+                    throw new Error(result.error?.message || 'Gagal memuat riwayat');
+                }
+                
+                const history = result.data.history || [];
+                
+                if (history.length === 0) {
+                    container.innerHTML = '<div class="no-results">Belum ada riwayat download</div>';
+                    return;
+                }
+                
+                container.innerHTML = '';
+                history.forEach(entry => {
+                    const entryDiv = document.createElement('div');
+                    entryDiv.className = 'history-item';
+                    
+                    const statusClass = entry.status === 'completed' ? 'success' : 
+                                       entry.status === 'failed' ? 'error' : 
+                                       entry.status === 'processing' ? 'info' : 'pending';
+                    
+                    const dateStr = new Date(entry.created_at).toLocaleString('id-ID');
+                    const finishedStr = entry.finished_at ? 
+                        new Date(entry.finished_at).toLocaleString('id-ID') : '-';
+                    
+                    let actionBtn = '';
+                    if (entry.status === 'completed' && entry.file_url) {
+                        actionBtn = `<a href="${entry.file_url}" download class="download-link-small">
+                            <button>Download</button>
+                        </a>`;
+                    }
+                    
+                    entryDiv.innerHTML = `
+                        <div class="history-item-header">
+                            <span class="history-status ${statusClass}">${entry.status}</span>
+                            <span class="history-date">${dateStr}</span>
+                        </div>
+                        <div class="history-item-url">${escapeHtml(entry.url)}</div>
+                        <div class="history-item-footer">
+                            <span class="history-finished">Selesai: ${finishedStr}</span>
+                            ${actionBtn}
+                        </div>
+                    `;
+                    
+                    container.appendChild(entryDiv);
+                });
+            } catch (error) {
+                console.error('History error:', error);
+                container.innerHTML = `<div class="error-message">Gagal memuat riwayat: ${error.message}</div>`;
+            }
+        }
+        
+        // Load history saat halaman dimuat
+        document.addEventListener('DOMContentLoaded', function() {
+            loadHistory();
+            // Auto-refresh history setiap 10 detik
+            setInterval(loadHistory, 10000);
         });
     </script>
 </body>

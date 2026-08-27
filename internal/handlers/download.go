@@ -1,101 +1,186 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
-	"os/exec"
+	"net/url"
 	"path/filepath"
 	"strings"
-	"time"
+
+	"Youtube_donwloader/config"
+	"Youtube_donwloader/internal/jobs"
 )
 
+var downloadQueue *jobs.Queue
+
+// InitDownloadQueue menginisialisasi download queue (dipanggil dari main)
+func InitDownloadQueue() {
+	downloadQueue = jobs.NewQueue(3, jobs.ProcessDownload)
+	// Set callback untuk update history ketika job selesai
+	downloadQueue.SetOnJobDone(func(job *jobs.DownloadJob) {
+		AddToHistory(job)
+	})
+}
+
+// DownloadHandler menangani request download baru (async)
 func DownloadHandler(w http.ResponseWriter, r *http.Request) {
-	url := strings.TrimSpace(r.FormValue("url"))
-	if url == "" {
-		http.Error(w, "URL tidak boleh kosong", http.StatusBadRequest)
+	if r.Method != http.MethodPost {
+		SendError(w, "METHOD_NOT_ALLOWED", "Method tidak diizinkan", http.StatusMethodNotAllowed)
 		return
 	}
 
-	if !isValidURL(url) {
-		http.Error(w, "URL tidak valid", http.StatusBadRequest)
-		return
+	var req struct {
+		URL string `json:"url"`
 	}
 
-	// Gunakan path yt-dlp dari environment variable atau default
-	ytdlpPath := os.Getenv("YTDLP_PATH")
-	if ytdlpPath == "" {
-		// Default untuk Windows: coba yt-dlp.exe, jika tidak ada coba yt-dlp di PATH
-		if _, err := os.Stat("yt-dlp.exe"); err == nil {
-			ytdlpPath = "yt-dlp.exe"
-		} else {
-			ytdlpPath = "yt-dlp" // default to yt-dlp di PATH
+	// Coba parse JSON dulu, jika gagal coba form
+	if r.Header.Get("Content-Type") == "application/json" {
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			SendError(w, "INVALID_REQUEST", "Request body tidak valid", http.StatusBadRequest)
+			return
 		}
+	} else {
+		req.URL = strings.TrimSpace(r.FormValue("url"))
 	}
 
-	// Untuk Windows: jika path relatif dan tidak ada slash, konversi ke absolute path
-	// atau gunakan format .\executable.exe
-	if !filepath.IsAbs(ytdlpPath) && !strings.Contains(ytdlpPath, string(os.PathSeparator)) {
-		// Coba resolve sebagai executable di current directory
-		if absPath, err := filepath.Abs(ytdlpPath); err == nil {
-			if _, err := os.Stat(absPath); err == nil {
-				ytdlpPath = absPath
-			} else {
-				// Jika tidak ditemukan, coba dengan .\ untuk Windows
-				if _, err := os.Stat("." + string(os.PathSeparator) + ytdlpPath); err == nil {
-					ytdlpPath, _ = filepath.Abs("." + string(os.PathSeparator) + ytdlpPath)
-				}
-			}
-		}
-	}
-
-	fileName := filepath.Join("./tmp", fmt.Sprintf("output_%d", time.Now().UnixNano()))
-
-	cmd := exec.Command(
-		ytdlpPath,
-		"--extract-audio",
-		"--audio-format", "mp3",
-		"--audio-quality", "0",
-		"--output", fileName+".%(ext)s",
-		"--no-playlist",
-		url,
-	)
-
-	var stderr strings.Builder
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		http.Error(
-			w,
-			fmt.Sprintf("Gagal mendownload: %v\nDetail Error: %s", err, stderr.String()),
-			http.StatusInternalServerError,
-		)
+	if req.URL == "" {
+		SendError(w, "MISSING_URL", "URL tidak boleh kosong", http.StatusBadRequest)
 		return
 	}
 
-	matches, _ := filepath.Glob(fileName + ".mp3")
+	if len(req.URL) > 2048 {
+		SendError(w, "URL_TOO_LONG", "URL terlalu panjang (maksimal 2048 karakter)", http.StatusBadRequest)
+		return
+	}
+
+	if !isValidURL(req.URL) {
+		SendError(w, "INVALID_URL", "URL tidak valid. Hanya mendukung YouTube dan SoundCloud", http.StatusBadRequest)
+		return
+	}
+
+	if downloadQueue == nil {
+		SendError(w, "SERVICE_UNAVAILABLE", "Download service belum siap", http.StatusServiceUnavailable)
+		return
+	}
+
+	job, err := downloadQueue.Submit(req.URL)
+	if err != nil {
+		SendError(w, "QUEUE_FULL", err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+
+	SendSuccess(w, map[string]interface{}{
+		"job_id":  job.ID,
+		"status":  job.Status,
+		"message": "Job download telah dibuat. Gunakan endpoint /download/{job_id}/status untuk mengecek status.",
+	}, http.StatusAccepted)
+}
+
+// DownloadStatusHandler menangani request status job
+func DownloadStatusHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		SendError(w, "METHOD_NOT_ALLOWED", "Method tidak diizinkan", http.StatusMethodNotAllowed)
+		return
+	}
+
+	jobID := r.URL.Path[len("/download/"):]
+	if idx := strings.Index(jobID, "/"); idx != -1 {
+		jobID = jobID[:idx]
+	}
+
+	if jobID == "" {
+		SendError(w, "MISSING_JOB_ID", "Job ID tidak ditemukan di URL", http.StatusBadRequest)
+		return
+	}
+
+	if downloadQueue == nil {
+		SendError(w, "SERVICE_UNAVAILABLE", "Download service belum siap", http.StatusServiceUnavailable)
+		return
+	}
+
+	job, ok := downloadQueue.Get(jobID)
+	if !ok {
+		SendError(w, "JOB_NOT_FOUND", "Job tidak ditemukan", http.StatusNotFound)
+		return
+	}
+
+	SendSuccess(w, job, http.StatusOK)
+}
+
+// DownloadFileHandler menangani download file yang sudah selesai
+func DownloadFileHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		SendError(w, "METHOD_NOT_ALLOWED", "Method tidak diizinkan", http.StatusMethodNotAllowed)
+		return
+	}
+
+	jobID := r.URL.Path[len("/download/"):]
+	if idx := strings.Index(jobID, "/file"); idx != -1 {
+		jobID = jobID[:idx]
+	}
+
+	if jobID == "" {
+		SendError(w, "MISSING_JOB_ID", "Job ID tidak ditemukan di URL", http.StatusBadRequest)
+		return
+	}
+
+	if downloadQueue == nil {
+		SendError(w, "SERVICE_UNAVAILABLE", "Download service belum siap", http.StatusServiceUnavailable)
+		return
+	}
+
+	job, ok := downloadQueue.Get(jobID)
+	if !ok {
+		SendError(w, "JOB_NOT_FOUND", "Job tidak ditemukan", http.StatusNotFound)
+		return
+	}
+
+	if job.Status != jobs.StatusCompleted {
+		SendError(w, "JOB_NOT_READY", "File belum siap untuk didownload", http.StatusBadRequest)
+		return
+	}
+
+	// File ada di jobDir, serve langsung
+	cfg := config.Load()
+	jobDir := filepath.Join(cfg.TempDir, fmt.Sprintf("job_%s", job.ID))
+	matches, _ := filepath.Glob(filepath.Join(jobDir, "*.mp3"))
 	if len(matches) == 0 {
-		http.Error(w, "File MP3 tidak ditemukan", http.StatusInternalServerError)
+		SendError(w, "FILE_NOT_FOUND", "File tidak ditemukan", http.StatusNotFound)
 		return
 	}
-	outputFile := matches[0]
 
+	outputFile := matches[0]
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filepath.Base(outputFile)))
 	w.Header().Set("Content-Type", "audio/mpeg")
 	http.ServeFile(w, r, outputFile)
-
-	defer os.Remove(outputFile)
 }
 
-func isValidURL(url string) bool {
-	allowedDomains := []string{
-		"youtube.com",
-		"youtu.be",
-		"soundcloud.com",
+func isValidURL(rawurl string) bool {
+	u, err := url.ParseRequestURI(rawurl)
+	if err != nil {
+		return false
 	}
 
-	for _, domain := range allowedDomains {
-		if strings.Contains(url, domain) {
+	if u.Scheme != "https" {
+		return false
+	}
+
+	host := strings.ToLower(u.Hostname())
+	allowedHosts := []string{
+		"youtube.com",
+		"www.youtube.com",
+		"m.youtube.com",
+		"youtu.be",
+		"soundcloud.com",
+		"www.soundcloud.com",
+	}
+
+	for _, allowed := range allowedHosts {
+		if host == allowed {
+			return true
+		}
+		if strings.HasSuffix(host, "."+allowed) {
 			return true
 		}
 	}

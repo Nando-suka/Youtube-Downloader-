@@ -37,6 +37,16 @@ func (m *APIKeyManager) GetCurrentKey() string {
 	return m.keys[m.currentIndex]
 }
 
+// GetCurrentIndex returns the current key index or -1 if no keys.
+func (m *APIKeyManager) GetCurrentIndex() int {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+	if len(m.keys) == 0 {
+		return -1
+	}
+	return m.currentIndex
+}
+
 func (m *APIKeyManager) RotateKey() string {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()

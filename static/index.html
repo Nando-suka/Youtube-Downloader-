@@ -1,34 +1,195 @@
 <!DOCTYPE html>
-<html>
+<html lang="id">
 <head>
-    <title>YouTube to MP3 Downloader</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Downloader | Convert to MP3</title>
     <link rel="stylesheet" href="/staticDua/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <!--Bagian Header-->
-    <header>
-        <h3 class="header-2">Selamat Datang di YouTube Downloader</h3>
+    <!-- Header -->
+    <header class="main-header">
+        <div class="header-content">
+            <div class="logo-container">
+                <i class="fab fa-youtube logo-icon"></i>
+                <h1 class="logo-text">YouTube<span class="logo-highlight">Downloader</span></h1>
+            </div>
+            <div class="header-info">
+                <i class="fas fa-music"></i>
+                <span>Convert YouTube videos to MP3 instantly</span>
+            </div>
+        </div>
     </header>
 
-    <!--Bagian Container-->
-    <div class="container">
-        <h1>YouTube to MP3 Converter</h1>
-        
-        <!-- Tambahan Fitur Pencarian -->
-        <div class="search-box">
-            <input type="text" id="searchInput" placeholder="Cari video...">
-            <button onclick="searchVideos()">Cari</button>
+    <!-- Hero Section -->
+    <section class="hero-section">
+        <div class="hero-content">
+            <div class="hero-text">
+                <h2><i class="fas fa-bolt"></i> Convert YouTube to MP3</h2>
+                <p class="hero-subtitle">Download high-quality MP3 files from YouTube videos quickly and easily</p>
+            </div>
+            <div class="hero-stats">
+                <div class="stat-item">
+                    <i class="fas fa-check-circle"></i>
+                    <span>100% Free</span>
+                </div>
+                <div class="stat-item">
+                    <i class="fas fa-bolt"></i>
+                    <span>Fast Conversion</span>
+                </div>
+                <div class="stat-item">
+                    <i class="fas fa-shield-alt"></i>
+                    <span>Safe & Secure</span>
+                </div>
+            </div>
         </div>
-        
-        <div id="searchResults" class="results-container"></div>
-        
-        <form action="/download" method="POST">
-            <input type="url" name="url" id="videoUrl" placeholder="Masukkan URL YouTube..." required>
-            <button type="submit">Convert to MP3</button>
-        </form>
-    </div>
+    </section>
 
-   
+    <!-- Main Container -->
+    <main class="main-container">
+        <!-- Search Section -->
+        <section class="card search-section">
+            <div class="section-header">
+                <h3><i class="fas fa-search"></i> Search YouTube Videos</h3>
+                <p>Find videos directly without leaving the page</p>
+            </div>
+            
+            <div class="search-container">
+                <div class="search-input-group">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" 
+                           id="searchInput" 
+                           class="search-input" 
+                           placeholder="Type song name, artist, or YouTube video title...">
+                    <button class="search-btn" onclick="searchVideos()">
+                        <i class="fas fa-search"></i> Search
+                    </button>
+                </div>
+                
+                <div class="search-tips">
+                    <p><i class="fas fa-lightbulb"></i> Tips: Try searching for "song name lyrics" or "artist song name"</p>
+                </div>
+            </div>
+
+            <!-- Search Results -->
+            <div id="searchResults" class="results-container">
+                <!-- Results will appear here -->
+            </div>
+        </section>
+
+        <!-- Download Section -->
+        <section class="card download-section">
+            <div class="section-header">
+                <h3><i class="fas fa-download"></i> Download MP3</h3>
+                <p>Paste YouTube URL or select from search results</p>
+            </div>
+
+            <form action="/download" method="POST" class="download-form">
+                <div class="url-input-group">
+                    <div class="url-input-header">
+                        <i class="fab fa-youtube url-icon"></i>
+                        <span>YouTube Video URL</span>
+                    </div>
+                    <input type="url" 
+                           name="url" 
+                           id="videoUrl" 
+                           class="url-input" 
+                           placeholder="https://www.youtube.com/watch?v=..." 
+                           required>
+                    <div class="url-examples">
+                        <small>Example: https://youtu.be/VIDEO_ID or https://www.youtube.com/watch?v=VIDEO_ID</small>
+                    </div>
+                </div>
+
+                <div class="download-options">
+                    <div class="option-item">
+                        <i class="fas fa-file-audio"></i>
+                        <span>Output Format: MP3 (Highest Quality)</span>
+                    </div>
+                    <div class="option-item">
+                        <i class="fas fa-tachometer-alt"></i>
+                        <span>Conversion Speed: Fast</span>
+                    </div>
+                </div>
+
+                <button type="submit" class="convert-btn">
+                    <i class="fas fa-magic"></i> Convert to MP3
+                </button>
+            </form>
+
+            <div class="how-to-use">
+                <h4><i class="fas fa-info-circle"></i> How to Use:</h4>
+                <ol>
+                    <li>Search for a video or paste YouTube URL</li>
+                    <li>Click "Convert to MP3" button</li>
+                    <li>Wait for processing</li>
+                    <li>Download your MP3 file</li>
+                </ol>
+            </div>
+        </section>
+
+        <!-- Features Section -->
+        <section class="card features-section">
+            <h3><i class="fas fa-star"></i> Why Choose Our Downloader?</h3>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-rocket"></i>
+                    </div>
+                    <h4>Fast Processing</h4>
+                    <p>Convert videos to MP3 in seconds with our optimized servers</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-music"></i>
+                    </div>
+                    <h4>High Quality</h4>
+                    <p>Get MP3 files with the best possible audio quality</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <h4>Safe & Secure</h4>
+                    <p>No malware, no viruses, and complete privacy protection</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-mobile-alt"></i>
+                    </div>
+                    <h4>Mobile Friendly</h4>
+                    <p>Works perfectly on all devices and screen sizes</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="main-footer">
+        <div class="footer-content">
+            <div class="footer-section">
+                <h5><i class="fas fa-download"></i> YouTube Downloader</h5>
+                <p>Convert YouTube videos to MP3 format instantly and for free</p>
+            </div>
+            <div class="footer-section">
+                <h5><i class="fas fa-exclamation-circle"></i> Disclaimer</h5>
+                <p>Download content only for personal use. Respect copyright laws.</p>
+            </div>
+            <div class="footer-section">
+                <h5><i class="fas fa-code"></i> Made with</h5>
+                <div class="tech-stack">
+                    <i class="fab fa-golang"></i>
+                    <i class="fab fa-html5"></i>
+                    <i class="fab fa-css3-alt"></i>
+                </div>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>© 2024 YouTube Downloader. All rights reserved.</p>
+        </div>
+    </footer>
 
     <script>
         async function searchVideos() {
@@ -36,40 +197,144 @@
             const resultsContainer = document.getElementById('searchResults');
             
             if (!searchInput.value.trim()) {
-                alert('Masukkan kata kunci pencarian');
+                showNotification('Please enter search keywords', 'warning');
                 return;
             }
 
             try {
+                // Show loading state
+                resultsContainer.innerHTML = `
+                    <div class="loading-state">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p>Searching for videos...</p>
+                    </div>
+                `;
+
                 const response = await fetch(`/search?q=${encodeURIComponent(searchInput.value)}`);
                 const data = await response.json();
                 
-                resultsContainer.innerHTML = '';
+                if (!data.items || data.items.length === 0) {
+                    resultsContainer.innerHTML = `
+                        <div class="no-results">
+                            <i class="fas fa-search"></i>
+                            <h4>No videos found</h4>
+                            <p>Try different keywords</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                resultsContainer.innerHTML = `
+                    <div class="search-header">
+                        <h4><i class="fas fa-video"></i> Search Results (${data.items.length})</h4>
+                        <button class="clear-btn" onclick="clearSearch()">
+                            <i class="fas fa-times"></i> Clear
+                        </button>
+                    </div>
+                `;
                 
                 data.items.forEach(item => {
                     const videoDiv = document.createElement('div');
                     videoDiv.className = 'video-item';
                     videoDiv.innerHTML = `
-                        <img src="${item.snippet.thumbnails.default.url}" alt="Thumbnail">
+                        <div class="video-thumbnail">
+                            <img src="${item.snippet.thumbnails.default.url}" alt="Thumbnail">
+                            <div class="video-overlay">
+                                <i class="fas fa-play"></i>
+                            </div>
+                        </div>
                         <div class="video-info">
-                            <h3>${item.snippet.title}</h3>
-                            <p>Channel: ${item.snippet.channel}</p>
-                            <button onclick="selectVideo('${item.id.videoID}')">Pilih</button>
+                            <h3 class="video-title">${item.snippet.title}</h3>
+                            <p class="video-channel">
+                                <i class="fas fa-user-circle"></i> ${item.snippet.channelTitle || 'Unknown Channel'}
+                            </p>
+                            <div class="video-actions">
+                                <button class="select-btn" onclick="selectVideo('${item.id.videoId}')">
+                                    <i class="fas fa-check"></i> Select
+                                </button>
+                                <button class="preview-btn" onclick="previewVideo('${item.id.videoId}')">
+                                    <i class="fas fa-eye"></i> Preview
+                                </button>
+                            </div>
                         </div>
                     `;
                     resultsContainer.appendChild(videoDiv);
                 });
+                
+                showNotification(`Found ${data.items.length} videos`, 'success');
+                
             } catch (error) {
                 console.error('Error:', error);
-                resultsContainer.innerHTML = 'Gagal memuat hasil pencarian';
+                resultsContainer.innerHTML = `
+                    <div class="error-state">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <h4>Search failed</h4>
+                        <p>Please try again later</p>
+                    </div>
+                `;
+                showNotification('Failed to search videos', 'error');
             }
         }
 
         function selectVideo(videoId) {
-            document.getElementById('videoUrl').value = `https://youtu.be/${videoId}`;
+            const urlInput = document.getElementById('videoUrl');
+            urlInput.value = `https://youtu.be/${videoId}`;
+            urlInput.focus();
+            
+            // Clear search results
             document.getElementById('searchResults').innerHTML = '';
             document.getElementById('searchInput').value = '';
+            
+            // Highlight the URL input
+            urlInput.classList.add('highlight');
+            setTimeout(() => urlInput.classList.remove('highlight'), 1000);
+            
+            showNotification('Video URL copied to input field', 'success');
         }
+        
+        function previewVideo(videoId) {
+            const previewUrl = `https://www.youtube.com/embed/${videoId}`;
+            const newWindow = window.open(previewUrl, 'Video Preview', 
+                'width=800,height=500,scrollbars=yes,resizable=yes');
+            if (newWindow) newWindow.focus();
+        }
+        
+        function clearSearch() {
+            document.getElementById('searchResults').innerHTML = '';
+            document.getElementById('searchInput').value = '';
+            showNotification('Search cleared', 'info');
+        }
+        
+        function showNotification(message, type = 'info') {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = `notification notification-${type}`;
+            notification.innerHTML = `
+                <i class="fas fa-${type === 'success' ? 'check-circle' : 
+                                  type === 'error' ? 'exclamation-circle' : 
+                                  type === 'warning' ? 'exclamation-triangle' : 'info-circle'}"></i>
+                <span>${message}</span>
+                <button onclick="this.parentElement.remove()"><i class="fas fa-times"></i></button>
+            `;
+            
+            // Add to body
+            document.body.appendChild(notification);
+            
+            // Auto remove after 3 seconds
+            setTimeout(() => {
+                if (notification.parentElement) {
+                    notification.remove();
+                }
+            }, 3000);
+        }
+        
+        // Add event listener for Enter key in search input
+        document.getElementById('searchInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                searchVideos();
+            }
+        });
     </script>
 </body>
 </html>
